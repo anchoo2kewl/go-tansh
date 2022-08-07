@@ -17,3 +17,5 @@
 
 # Exclude the binary output
 tansh
+
+.DS_Store

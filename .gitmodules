@@ -1,0 +1,3 @@
+[submodule "html-tansh"]
+	path = html-tansh
+	url = git@github.com:anchoo2kewl/html-tansh.git

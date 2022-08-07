@@ -12,13 +12,13 @@ $ docker build -t biswas/tansh:v0.1-SNAPSHOT .
 For production, use another dockerfile, `Dockerfile.production`
 
 ```
-$ docker run -d --name tansh -it --rm -p 3000:3000 -v $PWD:/go/src/tansh biswas/tansh:v0.1
+$ docker build -f Dockerfile.production -t biswas/tansh:v0.1 .
 ```
 
 To run the image:
 
 ```
-$ docker run -d --name tansh -it --rm -p 3000:3000 -v $PWD:/go/src/tansh biswas/tansh:v0.1
+$ docker run -d --name tansh-prod -it --rm -p 3001:3000 -v $PWD:/go/src/tansh biswas/tansh:v0.1
 # or to run the dev image:
 $ docker run -d --name tansh -it --rm -p 3000:3000 -v $PWD:/go/src/tansh biswas/tansh:v0.1-SNAPSHOT
 ```
