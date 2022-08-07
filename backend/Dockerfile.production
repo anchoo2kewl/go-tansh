@@ -13,7 +13,7 @@ RUN go mod verify
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /main .
 
-FROM gcr.io/distroless/static-debian11
+FROM gcr.io/distroless/static-debian11 as production
 
 COPY --from=base /main .
 

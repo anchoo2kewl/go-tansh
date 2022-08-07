@@ -1,4 +1,4 @@
-FROM golang:1.18-bullseye
+FROM golang:1.18-bullseye AS development
 
 RUN go install github.com/beego/bee/v2@latest
 
