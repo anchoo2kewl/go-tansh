@@ -2,11 +2,14 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
 
+	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -28,7 +31,7 @@ func contactHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	_, err := fmt.Fprint(w, "To get in touch, please send an email to <a href=\"mailto:anshuman@biswas.me\">anshuman@biswas.me</a>.")
 	if err != nil {
-		return 
+		return
 	}
 }
 
@@ -37,7 +40,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err := fmt.Fprint(w, "<h1>Welcome to my awesome site!</h1>")
 	if err != nil {
-		return 
+		return
 	}
 	getRuntime(w, r)
 }
@@ -63,19 +66,37 @@ func faqHandler(w http.ResponseWriter, r *http.Request) {
 `)
 }
 
-type Router struct {}
+type Router struct{}
 
 func main() {
 	r := chi.NewRouter()
+	r.Use(middleware.Logger)
+
+	dbUser, dbPassword, dbName, dbHost :=
+		os.Getenv("POSTGRES_USER"),
+		os.Getenv("POSTGRES_PASSWORD"),
+		os.Getenv("POSTGRES_DB"),
+		os.Getenv("POSTGRES_HOST")
+
+	database, err := Initialize(dbUser, dbPassword, dbName, dbHost)
+
+	if err != nil {
+		log.Fatalf("Could not set up database: %v", err)
+	}
+	defer database.Conn.Close()
+
 	r.Get("/", homeHandler)
 	r.Get("/contact", contactHandler)
 	r.Get("/faq", faqHandler)
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Page not found", http.StatusNotFound)
 	})
+	r.Mount("/events", EventsResource{}.Routes())
+	r.Mount("/rsvps", RsvpsResource{}.Routes())
+
 	fmt.Println("Starting the server on :3000...")
-	err := http.ListenAndServe("0.0.0.0:3000", r)
+	err = http.ListenAndServe("0.0.0.0:3000", r)
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
 }

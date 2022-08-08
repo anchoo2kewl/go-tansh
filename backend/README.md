@@ -3,24 +3,24 @@ A rewrite of Tansh.us using Go
 
 The easiest way to run is using docker.
 
-For dev machines, use the main `Dockerfile`
+For production machines, use the main `Dockerfile`
 
 ```
-$ docker build -t biswas/tansh:v0.1-SNAPSHOT .
+$ docker build -t biswas/tansh:v0.1 .
 ```
 
-For production, use another dockerfile, `Dockerfile.production`
+For dev, use another dockerfile, `Dockerfile.dev`
 
 ```
-$ docker build -f Dockerfile.production -t biswas/tansh:v0.1 .
+$ docker build -f Dockerfile.production -t biswas/tansh:v0.1-SNAPSHOT .
 ```
 
 To run the image:
 
 ```
-$ docker run -d --name tansh-prod -it --rm -p 3001:3000 -v $PWD:/go/src/tansh biswas/tansh:v0.1
+$ docker run -d --env-file ../.env --name tansh-prod -it --rm -p 3001:3000 -v $PWD:/go/src/tansh biswas/tansh:v0.1
 # or to run the dev image:
-$ docker run -d --name tansh -it --rm -p 3000:3000 -v $PWD:/go/src/tansh biswas/tansh:v0.1-SNAPSHOT
+$ docker run -d --env-file ../.env --name tansh -it --rm -p 3000:3000 -v $PWD:/go/src/tansh biswas/tansh:v0.1-SNAPSHOT
 ```
 
 The difference between dev and prod are two main things:
@@ -32,5 +32,7 @@ To run without docker, just pull the mods and run:
 
 ```
 $ go mod download github.com/go-chi/chi/v5
+$ go mod download   docgen
+$ go mod download github.com/go-chi/render
 $ go run main.go
 ```

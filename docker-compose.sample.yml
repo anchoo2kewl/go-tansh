@@ -54,7 +54,7 @@ services:
         - server-side
       volumes:
           - ./backend/migrations/.:/migrations
-      command: ["-path", "/migrations", "-database",  "postgres://postgres:qweasd@db:5432/tansh?sslmode=disable", "up"]
+      command: ["-path", "/migrations", "-database",  "{{PG_STRING}}", "up"]
       links: 
           - db
       

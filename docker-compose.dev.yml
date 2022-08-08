@@ -15,8 +15,7 @@ services:
   backend:
     build:
       context: backend
-      target: production
-      dockerfile: Dockerfile.production
+      target: development
     env_file:
       - .env  
     ports:
@@ -26,21 +25,12 @@ services:
       - server-side
     volumes:
       - ./backend:/go/src/tansh
-    depends_on:
-      db:
-        condition: service_healthy
 
   db:
       image: postgres:12-alpine
       restart: always
       env_file:
         - .env
-      healthcheck:
-        test: ["CMD-SHELL", "pg_isready", "-d", "db_prod"]
-        interval: 30s
-        timeout: 60s
-        retries: 5
-        start_period: 60s 
       networks:
         - server-side
       ports:
@@ -54,7 +44,7 @@ services:
         - server-side
       volumes:
           - ./backend/migrations/.:/migrations
-      command: ["-path", "/migrations", "-database",  "postgres://postgres:qweasd@db:5432/tansh?sslmode=disable", "up"]
+      command: ["-path", "/migrations", "-database",  "{{PG_STRING}}", "up"]
       links: 
           - db
       
