@@ -16,7 +16,6 @@ services:
     build:
       context: backend
       target: production
-      dockerfile: Dockerfile.production
     env_file:
       - .env  
     ports:
