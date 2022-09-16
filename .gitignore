@@ -23,3 +23,5 @@ tansh
 .env
 
 docker-compose.yml
+
+app

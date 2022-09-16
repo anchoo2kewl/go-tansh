@@ -7,10 +7,16 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 
+	"github.com/anchoo2kewl/tansh.us/controllers"
+	"github.com/anchoo2kewl/tansh.us/models"
+	"github.com/anchoo2kewl/tansh.us/templates"
+	"github.com/anchoo2kewl/tansh.us/views"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 )
 
 func getRuntime(w http.ResponseWriter, r *http.Request) {
@@ -26,47 +32,6 @@ func getRuntime(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintf(w, "I'm running on %s/%s.\n", myOS, myArch)
 	_, _ = fmt.Fprintf(w, "I'm running %s of WSL.\n", inWSL)
 }
-
-func contactHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html")
-	_, err := fmt.Fprint(w, "To get in touch, please send an email to <a href=\"mailto:anshuman@biswas.me\">anshuman@biswas.me</a>.")
-	if err != nil {
-		return
-	}
-}
-
-func homeHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html")
-
-	_, err := fmt.Fprint(w, "<h1>Welcome to my awesome site!</h1>")
-	if err != nil {
-		return
-	}
-	getRuntime(w, r)
-}
-
-func faqHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprint(w, `<h1>FAQ Page</h1>
-<ul>
-  <li>
-    <b>Is there a free version?</b>
-    Yes! We offer a free trial for 30 days on any paid plans.
-  </li>
-  <li>
-    <b>What are your support hours?</b>
-    We have support staff answering emails 24/7, though response
-    times may be a bit slower on weekends.
-  </li>
-  <li>
-    <b>How do I contact support?</b>
-    Email us - <a href="mailto:anshuman@biswas.me">anshuman@biswas.me</a>
-  </li>
-</ul>
-`)
-}
-
-type Router struct{}
 
 func main() {
 	r := chi.NewRouter()
@@ -85,17 +50,76 @@ func main() {
 	}
 	defer database.Conn.Close()
 
-	r.Get("/", homeHandler)
-	r.Get("/contact", contactHandler)
-	r.Get("/faq", faqHandler)
-	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "Page not found", http.StatusNotFound)
-	})
+	r.Get("/", controllers.StaticHandler(
+		views.Must(views.ParseFS(templates.FS, "home.gohtml", "tailwind.gohtml"))))
+	r.Get("/contact", controllers.StaticHandler(
+		views.Must(views.ParseFS(templates.FS, "contact.gohtml", "tailwind.gohtml"))))
+
+	userService := models.UserService{
+		DB: DB,
+	}
+
+	sessionService := models.SessionService{
+		DB: DB,
+	}
+
+	rsvpService := models.RsvpService{
+		DB: DB,
+	}
+
+	// Setup our controllers
+	usersC := controllers.Users{
+		UserService:    &userService,
+		SessionService: &sessionService,
+		RsvpService:    &rsvpService,
+	}
+
+	usersC.Templates.New = views.Must(views.ParseFS(
+		templates.FS, "signup.gohtml", "tailwind.gohtml"))
+
+	isSignupDisabled, err := strconv.ParseBool(os.Getenv("APP_DISABLE_SIGNUP"))
+
+	if isSignupDisabled {
+		fmt.Println("Signups Disabled ...")
+		r.Get("/signup", usersC.Disabled)
+	} else {
+		fmt.Println("Signups Enabled ...")
+		r.Get("/signup", usersC.New)
+		r.Post("/signup", usersC.Create)
+	}
+
+	usersC.Templates.SignIn = views.Must(views.ParseFS(
+		templates.FS, "signin.gohtml", "tailwind.gohtml"))
+
+	r.Get("/signin", usersC.SignIn)
+	r.Post("/signin", usersC.ProcessSignIn)
+
+	usersC.Templates.LoggedIn = views.Must(views.ParseFS(
+		templates.FS, "events.gohtml", "tailwind.gohtml"))
+
+	r.Get("/users/me", usersC.CurrentUser)
+	r.Get("/users/logout", usersC.Logout)
+
 	r.Mount("/events", EventsResource{}.Routes())
 	r.Mount("/rsvps", RsvpsResource{}.Routes())
 
-	fmt.Println("Starting the server on :3000...")
-	err = http.ListenAndServe("0.0.0.0:3000", r)
+	port_val, port_present := os.LookupEnv("APP_PORT")
+	fmt.Printf("APP_PORT env variable present: %t\n", port_present)
+
+	if !port_present {
+		fmt.Println("Using default port of 3000!")
+		port_val = strconv.Itoa(3000)
+	}
+
+	fmt.Println("Starting the server on :{}...", port_val)
+
+	csrfKey := os.Getenv("APP_CSRF_KEY")
+	csrfMw := csrf.Protect(
+		[]byte(csrfKey),
+		// TODO: Fix this before deploying
+		csrf.Secure(false),
+	)
+	err = http.ListenAndServe("0.0.0.0:"+port_val, csrfMw(r))
 	if err != nil {
 		log.Fatal(err)
 	}

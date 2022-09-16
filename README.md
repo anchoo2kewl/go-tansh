@@ -12,9 +12,9 @@ $ cp .env.sample .env
 $ export $(xargs < .env)
 $ export POSTGRESQL_URL="postgres:\/\/$POSTGRES_USER:$POSTGRES_PASSWORD@$POSTGRES_HOST:5432\/$POSTGRES_DB?sslmode=disable"
 # For Mac
-$ sed -i '' "s/{{PG_STRING}}/$POSTGRESQL_URL/g" ../docker-compose.yml
+$ sed -i '' "s/{{PG_STRING}}/$POSTGRESQL_URL/g" docker-compose.yml
 $ For Linux
-$ sed -i "s/{{PG_STRING}}/$POSTGRESQL_URL/g" ../docker-compose.yml
+$ sed -i "s/{{PG_STRING}}/$POSTGRESQL_URL/g" docker-compose.yml
 $ docker-compose up
 ```
 

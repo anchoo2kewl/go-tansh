@@ -44,3 +44,29 @@ $ go mod download   docgen
 $ go mod download github.com/go-chi/render
 $ go run main.go
 ```
+
+To backup the database:
+
+# On the remote machine
+$ export $(xargs < ../.env)
+# A docker restart may be required
+$ docker restart `docker container ls  | grep 'db' | awk '{print $1}'`
+$ docker exec -t `docker container ls  | grep 'db' | awk '{print $1}'` pg_dumpall -c -U $POSTGRES_USER | gzip > ~/dump_$(date +"%Y-%m-%d_%H_%M_%S").gz
+
+# On the local machine
+$ export $(xargs < ../.env)
+# Clear data
+$ docker-compose down && docker volume rm docker-tansh_db-data
+$ gunzip < dump_*.gz | docker exec -i `docker container ls  | grep 'db' | awk '{print $1}'` psql -U $POSTGRES_USER -d $POSTGRES_DB
+
+# Create roles before creating users:
+
+# It is important that the readeer role is the first. Since all users are created with this default role.
+$ docker exec -i `docker container ls  | grep 'db' | awk '{print $1}'` psql -U $POSTGRES_USER -d $POSTGRES_DB -c "insert into roles (name, description) values ('viewer','Only has readonly access');"
+
+$ docker exec -i `docker container ls  | grep 'db' | awk '{print $1}'` psql -U $POSTGRES_USER -d $POSTGRES_DB -c "insert into roles (name, description) values ('editor','Can edit data but no admin privileges');"
+
+$ docker exec -i `docker container ls  | grep 'db' | awk '{print $1}'` psql -U $POSTGRES_USER -d $POSTGRES_DB -c "insert into roles (name, description) values ('admin','Is the Superuser of this system');"
+
+# Check if creation has worked fine:
+$ docker exec -i `docker container ls  | grep 'db' | awk '{print $1}'` psql -U $POSTGRES_USER -d $POSTGRES_DB -c "select * from roles"
