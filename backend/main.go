@@ -16,7 +16,6 @@ import (
 	"github.com/anchoo2kewl/tansh.us/views"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
 )
 
 func getRuntime(w http.ResponseWriter, r *http.Request) {
@@ -113,13 +112,13 @@ func main() {
 
 	fmt.Println("Starting the server on :{}...", port_val)
 
-	csrfKey := os.Getenv("APP_CSRF_KEY")
-	csrfMw := csrf.Protect(
-		[]byte(csrfKey),
-		// TODO: Fix this before deploying
-		csrf.Secure(false),
-	)
-	err = http.ListenAndServe("0.0.0.0:"+port_val, csrfMw(r))
+	// csrfKey := os.Getenv("APP_CSRF_KEY")
+	// csrfMw := csrf.Protect(
+	// 	[]byte(csrfKey),
+	// 	// TODO: Fix this before deploying
+	// 	csrf.Secure(false),
+	// )
+	err = http.ListenAndServe("0.0.0.0:"+port_val, r)
 	if err != nil {
 		log.Fatal(err)
 	}
