@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/anchoo2kewl/tansh.us/controllers"
 	"github.com/anchoo2kewl/tansh.us/models"
@@ -16,6 +17,7 @@ import (
 	"github.com/anchoo2kewl/tansh.us/views"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 )
 
 func getRuntime(w http.ResponseWriter, r *http.Request) {
@@ -33,8 +35,10 @@ func getRuntime(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	r1 := chi.NewRouter()
+	r2 := chi.NewRouter()
+	r1.Use(middleware.Logger)
+	r2.Use(middleware.Logger)
 
 	dbUser, dbPassword, dbName, dbHost :=
 		os.Getenv("POSTGRES_USER"),
@@ -49,9 +53,12 @@ func main() {
 	}
 	defer database.Conn.Close()
 
-	r.Get("/", controllers.StaticHandler(
+	r1.Get("/", controllers.StaticHandler(
 		views.Must(views.ParseFS(templates.FS, "home.gohtml", "tailwind.gohtml"))))
-	r.Get("/contact", controllers.StaticHandler(
+
+	r2.Get("/", controllers.StaticHandler(
+		views.Must(views.ParseFS(templates.FS, "home.gohtml", "tailwind.gohtml"))))
+	r1.Get("/contact", controllers.StaticHandler(
 		views.Must(views.ParseFS(templates.FS, "contact.gohtml", "tailwind.gohtml"))))
 
 	userService := models.UserService{
@@ -80,46 +87,79 @@ func main() {
 
 	if isSignupDisabled {
 		fmt.Println("Signups Disabled ...")
-		r.Get("/signup", usersC.Disabled)
+		r1.Get("/signup", usersC.Disabled)
 	} else {
 		fmt.Println("Signups Enabled ...")
-		r.Get("/signup", usersC.New)
-		r.Post("/signup", usersC.Create)
+		r1.Get("/signup", usersC.New)
+		r1.Post("/signup", usersC.Create)
 	}
 
 	usersC.Templates.SignIn = views.Must(views.ParseFS(
 		templates.FS, "signin.gohtml", "tailwind.gohtml"))
 
-	r.Get("/signin", usersC.SignIn)
-	r.Post("/signin", usersC.ProcessSignIn)
+	r1.Get("/signin", usersC.SignIn)
+	r1.Post("/signin", usersC.ProcessSignIn)
 
 	usersC.Templates.LoggedIn = views.Must(views.ParseFS(
 		templates.FS, "events.gohtml", "tailwind.gohtml"))
 
-	r.Get("/users/me", usersC.CurrentUser)
-	r.Get("/users/logout", usersC.Logout)
+	r1.Get("/users/me", usersC.CurrentUser)
+	r1.Get("/users/logout", usersC.Logout)
 
-	r.Mount("/events", EventsResource{}.Routes())
-	r.Mount("/rsvps", RsvpsResource{}.Routes())
+	r2.Mount("/events", EventsResource{}.Routes())
+	r2.Mount("/rsvps", RsvpsResource{}.Routes())
 
-	port_val, port_present := os.LookupEnv("APP_PORT")
+	app_port_val, port_present := os.LookupEnv("APP_PORT")
 	fmt.Printf("APP_PORT env variable present: %t\n", port_present)
 
 	if !port_present {
 		fmt.Println("Using default port of 3000!")
-		port_val = strconv.Itoa(3000)
+		app_port_val = strconv.Itoa(3000)
 	}
 
-	fmt.Println("Starting the server on :{}...", port_val)
+	fmt.Println("Starting the server on :{}...", app_port_val)
 
-	// csrfKey := os.Getenv("APP_CSRF_KEY")
-	// csrfMw := csrf.Protect(
-	// 	[]byte(csrfKey),
-	// 	// TODO: Fix this before deploying
-	// 	csrf.Secure(false),
-	// )
-	err = http.ListenAndServe("0.0.0.0:"+port_val, r)
-	if err != nil {
-		log.Fatal(err)
+	internal_port_val, port_present := os.LookupEnv("INTERNAL_PORT")
+	fmt.Printf("INTERNAL_PORT env variable present: %t\n", port_present)
+
+	if !port_present {
+		fmt.Println("Using default port of 6000!")
+		internal_port_val = strconv.Itoa(6000)
 	}
+
+	fmt.Println("Starting the internal server on :{}...", internal_port_val)
+
+	isCsrfSecure, err := strconv.ParseBool(os.Getenv("APP_CSRF_SECURE"))
+
+	if isCsrfSecure {
+		fmt.Println("CSRF Secure Enabled ...")
+	} else {
+		fmt.Println("CSRF Secure Disabled ...")
+	}
+
+	csrfKey := os.Getenv("APP_CSRF_KEY")
+	csrfMw := csrf.Protect(
+		[]byte(csrfKey),
+		csrf.Secure(isCsrfSecure),
+	)
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		err = http.ListenAndServe("0.0.0.0:"+app_port_val, csrfMw(r1))
+		if err != nil {
+			log.Fatal(err)
+		}
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
+		err = http.ListenAndServe("0.0.0.0:"+internal_port_val, r2)
+		if err != nil {
+			log.Fatal(err)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+
 }
